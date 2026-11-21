@@ -702,7 +702,7 @@ st.sidebar.caption("※ 한 파일만 올려도 해당 탭은 동작합니다.")
 st.set_page_config(
     page_title="극지식물 생육 분석 대시보드", layout="wide"
 )
-st.title("송천고에서는 극지식물이 어떻게 자랄까? 잘 안 자란다.")
+st.title("송천고에서는 극지식물이 어떻게 자랄까????")
 st.caption("데이터 출처: " + school_label + " 극지식물 실험 데이터 | 작성일: 2026")
 
 with st.spinner("데이터를 읽고 표준화하는 중..."):
