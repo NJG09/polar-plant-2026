@@ -24,21 +24,37 @@ PLOT_FONT = "Malgun Gothic, Apple SD Gothic Neo, sans-serif"
 
 
 # ============================================================
-# CSV 읽기 (인코딩 이중 시도)
+# CSV 읽기 (인코딩 이중 시도 · 탭 구분 안전장치)
 # ============================================================
 @st.cache_data
 def read_csv_file(file):
-    """업로드된 파일을 utf-8-sig → cp949 순으로 시도하여 읽는다."""
+    """utf-8-sig → cp949 순으로 시도.
+    열이 1개만 나오면 탭(tab) 구분일 가능성이 높으므로
+    sep=None(자동감지) 또는 sep='\\t'로 다시 읽는다."""
     if file is None:
         return pd.DataFrame()
     raw = file.getvalue()
     for enc in ("utf-8-sig", "cp949"):
         try:
-            return pd.read_csv(io.BytesIO(raw), encoding=enc)
+            df = pd.read_csv(io.BytesIO(raw), encoding=enc)
+            # 구분자가 틀려서 열이 1개만 나온 경우 → 재도전
+            if df.shape[1] == 1:
+                first_val = str(df.iloc[0, 0])
+                if "\t" in first_val:
+                    df_auto = pd.read_csv(
+                        io.BytesIO(raw), encoding=enc, sep=None, engine="python"
+                    )
+                    if df_auto.shape[1] > 1:
+                        return df_auto
+                    df_tab = pd.read_csv(io.BytesIO(raw), encoding=enc, sep="\t")
+                    if df_tab.shape[1] > 1:
+                        return df_tab
+            return df
         except Exception:
             continue
     try:
-        return pd.read_csv(io.BytesIO(raw), encoding="cp949", sep=None, engine="python")
+        df = pd.read_csv(io.BytesIO(raw), sep=None, engine="python")
+        return df
     except Exception:
         return pd.DataFrame()
 
@@ -47,7 +63,6 @@ def read_csv_file(file):
 # 열 이름 표준화 (KeyError 방지)
 # ============================================================
 def std_cols(df):
-    """어떤 학교의 CSV든 표준 열 이름으로 통일한다."""
     df = df.copy()
     df.columns = [str(c).strip() for c in df.columns]
 
@@ -167,7 +182,7 @@ def daily_timeseries(df, col, color, title):
 
 
 # ============================================================
-# 학교명 추출 (UploadedFile 또는 문자열 대응)
+# 학교명 추출
 # ============================================================
 def _get_filename(obj):
     if obj is None:
@@ -227,11 +242,16 @@ def render_tab1(env_df, growth_df):
             if not env_df.empty and "time" in env_df.columns:
                 t = env_df["time"].dropna()
                 if len(t) > 0:
-                    env_period = f"{t.min().strftime('%Y-%m-%d')} ~ {t.max().strftime('%Y-%m-%d')}"
+                    env_period = (
+                        f"{t.min().strftime('%Y-%m-%d')} ~ "
+                        f"{t.max().strftime('%Y-%m-%d')}"
+                    )
                 else:
                     env_period = "알 수 없음"
-                env_cols = [c for c in ["temperature", "humidity", "ph", "ec"]
-                            if c in env_df.columns]
+                env_cols = [
+                    c for c in ["temperature", "humidity", "ph", "ec"]
+                    if c in env_df.columns
+                ]
                 summary_rows.append({
                     "데이터": "환경 데이터",
                     "개체 수": "―",
